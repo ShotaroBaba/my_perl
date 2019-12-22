@@ -39,6 +39,6 @@ foreach my $i (split(" ", $concatenated_str)) {
     $word_count{$i} += 1;
 }
 
-foreach my $i (@word_keys) {
+foreach my $i (keys(%word_count)) {
     print "The number of word ".$i." is ".$word_count{$i}."\n";
 }

@@ -1,0 +1,5 @@
+*.tar.gz
+*.tar
+text_data
+compressed_data
+outputs
