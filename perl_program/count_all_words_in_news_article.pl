@@ -11,88 +11,95 @@ my $utf8_stoplist = getStopWords('en', 'UTF-8');
 sub create_word_array() {
     
     my @text_file = File::Find::Rule->file()->in( '../text_data/20news-18828' );
-    my $concatenated_str = "";
-    foreach my $i (@text_file){
+    my %text_dict;
 
+    foreach my $i (@text_file){
         open(my $fh, '<:encoding(UTF-8)', $i) or die "Could not open file '$i' $!";
+        my $concatenated_str = "";
         #print "Now reading...".$i.".\n";
         while (my $row = <$fh>) {  
             chomp $row;
             # Concatenate the str with " "
-            $concatenated_str.=$row." ";
+            $concatenated_str.=$row." ";   
         }
+        # print '*******************************************************************';
+        # print $concatenated_str;
+        # print '*******************************************************************';
+        $concatenated_str =~ s/[\S]+@[\S]+\.[\S]+//g;
+
+        # Removing http address
+        $concatenated_str =~ s/(ht|f)tps?:\/\/[\S]+//g;
+
+        # Removing punctuations.
+        $concatenated_str =~ s/[[:punct:]]//g;
+        
+        # print $tmp_txt;
+        $concatenated_str = lc $concatenated_str;
+
+        my @tmp_array = split /\s+/,  $concatenated_str;
+         #print ("\n\ncontents of tmp array: ".join(" ", @tmp_array)."\n\n");
+        @tmp_array = grep {!/^.{1,3}$/}  @tmp_array;
+
+        # Remove space:
+        @tmp_array = grep {!/^\s*$/}  @tmp_array;
+
+        # Remove stopwords.
+        @tmp_array = grep { !$utf8_stoplist->{$_} } @tmp_array;        
+        
+        # Remove numbers.
+        @tmp_array = grep {!/^\d+$/} @tmp_array;
+        
+        # Remove words with 30 characters.
+        @tmp_array = grep {!/.{31,}/} @tmp_array;
+        # Put generated array to text.
+        # print @tmp_array;
+        #print "\n\nArray Result: \n\n".$tmp_array;
+        # print ("\n\ncontents of tmp array: ".join(" ", @tmp_array)."\n\n");
+        $text_dict{$i} = \@tmp_array;
+        
     }
-    
-    # Removing email address.
-    $concatenated_str =~ s/[\S]+@[\S]+\.[\S]+//g;
 
-    # Removing http address
-    $concatenated_str =~ s/(ht|f)tps?:\/\/[\S]+//g;
-
-    # Removing punctuations.
-    $concatenated_str =~ s/[[:punct:]]//g;
-    
-    
-    $concatenated_str = lc $concatenated_str;
-    my @splitted_words = split(" ", $concatenated_str);
-
-    #
-    @splitted_words = grep {!/^.{1,3}$/}  @splitted_words;
-
-    # Remove stopwords.
-    @splitted_words = grep { !$utf8_stoplist->{$_} } @splitted_words;
-    
-    # Remove numbers.
-    @splitted_words = grep {!/^\d+$/} @splitted_words;
-    
-    # Remove words with 30 characters.
-    @splitted_words = grep {!/.{31,}/}  @splitted_words;
-
-    return @splitted_words;
+    return %text_dict;
 }
 
-@splitted_words = create_word_array();
+my %split_words = create_word_array();
 
-# Decleare dictionary.
+print "Process finished!";
+
 my %word_count;
+foreach my $f_value (keys %split_words){
+    my $tmp_arr_len = $#{$split_words{$f_value}} + 1;
+    for(my $j=0; $j < $tmp_arr_len; $j+=1){
+        $word_count{$split_words{$f_value}->[$j]} += 1;
+    }
+}
+
 my %word_i_to_w;
-my %word_w_to_d;
+my %word_w_to_i;
+my $counter = 0;
 
-# Correspond words.
-my @uniq_words = uniq(@splitted_words);
-# Create lenght of splitted_words.
-my $len_array = $#uniq_words + 1;
-
-for (my $i =0; $i < $len_array ;$i+=1 ){
-    $word_i_to_w{$i} = $uniq_words[$i];
-    $word_w_to_i{$uniq_words[$i]} = $i;
+foreach my $word_count_key (keys %word_count){
+    $word_i_to_w{$counter} = $word_count_key;
+    $word_w_to_i{$word_count_key} = $counter;
+    $counter+=1;
 }
 
-# Declare unique word first.
-foreach my $i (uniq(@splitted_words)) {
-    $word_count{$i} = 0;
-    #print "$i///";
+# Count the occurrence of all words and then store it as an corpus...
+
+my %corpus;
+foreach my $f_value (keys %split_words) {
+
+    my $tmp_arr_len = $#{$split_words{$f_value}} + 1;
+    my %count_dict;
+
+    # Count the number of occurrence.
+    
+    for(my $j=0; $j < $tmp_arr_len; $j+=1){
+        $count_dict{ $word_w_to_i{ $split_words{$f_value}->[$j]} } += 1;
+    }
+    $corpus{$f_value} = \%count_dict;
 }
 
-# Then calculate the words.
-foreach my $i (@splitted_words) {
-    $word_count{$i} += 1;
-}
-print "The number of words: \n";
-foreach my $i (sort { $word_count{$a} <=> $word_count{$b} } keys(%word_count)) {
-    print "The number of word $i is $word_count{$i}\n";
-}
-
-print "Dict contents: \n";
-foreach my $i (sort {$word_i_to_w{$a} cmp $word_i_to_w{$b}} keys(%word_i_to_w)){
-    #print "key : $i words: ".$word_i_to_w{$i}."\n"
-}
-
-# Next, save the dictionary data to ../output folder.
-
-# Create folder. If exists, the program does not create a program.
-
-# Create output directory
 my $output_dir = '../outputs';
 -e $directory or eval { make_path($output_dir) };
 
@@ -101,17 +108,62 @@ my $newsarticle_20 = $output_dir."/20news_18828";
 
 my $i_w_output = $newsarticle_20."/output_i_w.json";
 my $w_i_output = $newsarticle_20."/output_w_i.json";
-
-print $output_dir."\n";
-print $newsarticle_20."\n";
-print $i_w_output."\n";
+my $word_count_output = $newsarticle_20."/output_word_count.json";
+my $corpus_output = $newsarticle_20."/output_corpus.json";
+my $gensim_dict_output = $newsarticle_20."/output_dict_gensim.json";
+my $gensim_corpus_output = $newsarticle_20."/outputo_corpus_gensim.json";
 my $json = encode_json \%word_i_to_w;
-#print $json;
 write_text_to_file_utf8($i_w_output,$json);
-
 $json = encode_json \%word_w_to_i;
-#print $json;
 write_text_to_file_utf8($w_i_output,$json);
+
+write_text_to_file_utf8($word_count_output, encode_json \%word_count);
+write_text_to_file_utf8($corpus_output, encode_json \%corpus);
+write_dict_gensim_utf8($gensim_dict_output, %word_w_to_i,%word_count);
+
+write_corpus_gensim_utf8($gensim_corpus_output);
+
+# Write gensim format dictionary
+sub write_dict_gensim_utf8 {
+    my $fp = $_[0];
+    my $word_w_to_i = $_[1];
+    my $word_count = $_[2];
+
+    open(my $fh, '>:encoding(UTF-8)', $fp)
+    or die "Could not open file '$fp'";
+    foreach my $dict_key (keys %word_w_to_i){
+        print $fh $word_w_to_i{$dict_key}."\t".$dict_key."\t".$word_count{$dict_key}."\n";
+    }
+    close $fh;
+    print "\ndone writing $fp";
+}
+
+# Write gensim format corpus
+sub write_corpus_gensim_utf8 {
+    
+    my $fp = $_[0];
+    my $tuple_str = "[";
+    foreach my $corpus_key (keys %corpus){
+        $tuple_str.="[";
+        $inside_tuple="";
+        foreach my $tuple_key (keys %{$corpus{$corpus_key}}){
+            $inside_tuple.="($tuple_key,".$corpus{$corpus_key}{$tuple_key}."),";
+            
+        }
+        
+        $inside_tuple =~ s/,+$//;
+        $tuple_str.=$inside_tuple."],"
+    }
+
+    $tuple_str =~ s/,+$//;
+    $tuple_str.="]";
+    open(my $fh, '>:encoding(UTF-8)', $fp)
+    or die "Could not open file '$fp'";
+    print $fh $tuple_str;
+    close $fh;
+    print "done writing $fp";
+    
+}
 
 sub write_text_to_file_utf8 {
     my ($fp, $text) = @_;
