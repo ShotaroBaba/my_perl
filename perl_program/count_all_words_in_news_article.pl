@@ -4,9 +4,12 @@ use List::Uniq ':all';
 use String::Util ':all';
 use JSON;
 use Lingua::StopWords qw( getStopWords );
+use Lingua::Stem::Snowball;
 
 my $utf8_stoplist = getStopWords('en', 'UTF-8');
 
+# Declare a new stemmer.
+my $stemmer = Lingua::Stem::Snowball->new( lang => 'en' );
 # NOTE: This program consume a large amount of memory. Please remind it.
 sub create_word_array() {
     
@@ -30,21 +33,25 @@ sub create_word_array() {
         # Removing http address
         $concatenated_str =~ s/(ht|f)tps?:\/\/[\S]+//g;
 
-        # Removing punctuations.
-        $concatenated_str =~ s/[[:punct:]]//g;
-        
-        # print $tmp_txt;
+        # lower characters;
         $concatenated_str = lc $concatenated_str;
 
         my @tmp_array = split /\s+/,  $concatenated_str;
-         #print ("\n\ncontents of tmp array: ".join(" ", @tmp_array)."\n\n");
-        @tmp_array = grep {!/^.{1,3}$/}  @tmp_array;
+
+        # Remove stopwords before removing punctuation.
+        @tmp_array = grep { !$utf8_stoplist->{$_} } @tmp_array; 
+        
+        # Removing punctuation from all elements in the array.
+        @tmp_array = map { (my $tmp = $_) =~ s/[[:punct:]]//g; $tmp; } @tmp_array;
 
         # Remove space:
         @tmp_array = grep {!/^\s*$/}  @tmp_array;
 
-        # Remove stopwords.
-        @tmp_array = grep { !$utf8_stoplist->{$_} } @tmp_array;        
+        # Removing the characters with numbers.
+        @tmp_array = map { (my $tmp = $_) =~ s/^[\S]*[0-9]+[\S]*$//g; $tmp; } @tmp_array;
+
+        $stemmer->stem_in_place(\@tmp_array);
+        @tmp_array = grep {!/^.{1,3}$/}  @tmp_array;
         
         # Remove numbers.
         @tmp_array = grep {!/^\d+$/} @tmp_array;
@@ -110,7 +117,7 @@ my $i_w_output = $newsarticle_20."/output_i_w.json";
 my $w_i_output = $newsarticle_20."/output_w_i.json";
 my $word_count_output = $newsarticle_20."/output_word_count.json";
 my $corpus_output = $newsarticle_20."/output_corpus.json";
-my $gensim_dict_output = $newsarticle_20."/output_dict_gensim.json";
+my $gensim_dict_output = $newsarticle_20."/output_dict_gensim.tsv";
 my $gensim_corpus_output = $newsarticle_20."/outputo_corpus_gensim.json";
 my $json = encode_json \%word_i_to_w;
 write_text_to_file_utf8($i_w_output,$json);
