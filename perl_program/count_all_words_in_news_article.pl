@@ -10,6 +10,10 @@ my $utf8_stoplist = getStopWords('en', 'UTF-8');
 
 # Declare a new stemmer.
 my $stemmer = Lingua::Stem::Snowball->new( lang => 'en' );
+
+# Count a number of document.
+my $doc_count = 0;
+
 # NOTE: This program consume a large amount of memory. Please remind it.
 sub create_word_array() {
     
@@ -64,12 +68,16 @@ sub create_word_array() {
         # print ("\n\ncontents of tmp array: ".join(" ", @tmp_array)."\n\n");
         $text_dict{$i} = \@tmp_array;
         
+        $doc_count+=1;
     }
 
     return %text_dict;
 }
 
 my %split_words = create_word_array();
+my $json_text = encode_json %split_words;
+
+
 
 print "Process finished!";
 
@@ -112,7 +120,7 @@ my $output_dir = '../outputs';
 
 my $newsarticle_20 = $output_dir."/20news_18828";
 -e $newsarticle_20 or eval { make_path($newsarticle_20) };
-
+my $text_output_preprocessed_path = $newsarticle_20."/output_text_preprocessed.json";
 my $i_w_output = $newsarticle_20."/output_i_w.json";
 my $w_i_output = $newsarticle_20."/output_w_i.json";
 my $word_count_output = $newsarticle_20."/output_word_count.json";
@@ -120,6 +128,16 @@ my $corpus_output = $newsarticle_20."/output_corpus.json";
 my $gensim_dict_output = $newsarticle_20."/output_dict_gensim.tsv";
 my $gensim_corpus_output = $newsarticle_20."/outputo_corpus_gensim.json";
 my $json = encode_json \%word_i_to_w;
+
+
+# Open json text for the output...
+open(my $fh, '>:encoding(UTF-8)', $text_output_preprocessed_path)
+    or die "Could not open file '$text_output_preprocessed_path'";
+print $fh $json_text."\n";
+close $fh;
+print "\ndone writing $text_output_preprocessed_path";
+
+
 write_text_to_file_utf8($i_w_output,$json);
 $json = encode_json \%word_w_to_i;
 write_text_to_file_utf8($w_i_output,$json);
@@ -138,6 +156,7 @@ sub write_dict_gensim_utf8 {
 
     open(my $fh, '>:encoding(UTF-8)', $fp)
     or die "Could not open file '$fp'";
+    print $fh $doc_count."\n";
     foreach my $dict_key (keys %word_w_to_i){
         print $fh $word_w_to_i{$dict_key}."\t".$dict_key."\t".$word_count{$dict_key}."\n";
     }
