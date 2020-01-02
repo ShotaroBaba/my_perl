@@ -5,14 +5,21 @@ use String::Util ':all';
 use JSON;
 use Lingua::StopWords qw( getStopWords );
 use Lingua::Stem::Snowball;
+require "./stopword_list.pl";
 
-my $utf8_stoplist = getStopWords('en', 'UTF-8');
+#my $utf8_stoplist = getStopWords('en', 'UTF-8');
+my $utf8_stoplist = generate_stopwords();
 
 # Declare a new stemmer.
 my $stemmer = Lingua::Stem::Snowball->new( lang => 'en' );
 
 # Count a number of document.
 my $doc_count = 0;
+print 'test\n';
+print $utf8_stoplist;
+print %utf8_stoplist;
+print $utf8_stoplist->{"this"};
+print $utf8_stoplist->{"and"};
 
 # NOTE: This program consume a large amount of memory. Please remind it.
 sub create_word_array() {
@@ -43,7 +50,7 @@ sub create_word_array() {
         my @tmp_array = split /\s+/,  $concatenated_str;
 
         # Remove stopwords before removing punctuation.
-        @tmp_array = grep { !$utf8_stoplist->{$_} } @tmp_array; 
+        @tmp_array = grep { !$utf8_stoplist{$_} } @tmp_array; 
         
         # Removing punctuation from all elements in the array.
         @tmp_array = map { (my $tmp = $_) =~ s/[[:punct:]]//g; $tmp; } @tmp_array;
@@ -62,6 +69,8 @@ sub create_word_array() {
         
         # Remove words with 30 characters.
         @tmp_array = grep {!/.{31,}/} @tmp_array;
+
+        @tmp_array = grep { $_ ne '' } @tmp_array;
         # Put generated array to text.
         # print @tmp_array;
         #print "\n\nArray Result: \n\n".$tmp_array;
@@ -75,7 +84,7 @@ sub create_word_array() {
 }
 
 my %split_words = create_word_array();
-my $json_text = encode_json %split_words;
+my $json_text = encode_json \%split_words;
 
 
 
